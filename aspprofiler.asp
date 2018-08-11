@@ -305,7 +305,7 @@ Sub CheckLine(ByVal sLine, ByRef bSkipLine, ByRef bSkipTime, ByRef bSkipAbsolute
          bSkipLine = True
          Exit Sub
       Case "case", "dim", "public", "private", "const", "class", "sub", "function", "property", "static", "end"
-         bSkipLine = True
+         bSkipLine = (Not bUnfinishedLine)
          Exit Sub
       Case "select", "class"
          bSkipLine = False
