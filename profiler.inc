@@ -5,9 +5,19 @@ Const sInternalCount = "#LINECOUNT#"
 Const sInternalFileName = "#FILENAME#"
 Class ProfilerBase
     Private FileSystemObject
+    Private ScriptStartRegex
+    Private ScriptEndRegex
 
     Private Sub Class_Initialize()
         Set FileSystemObject = Server.CreateObject("Scripting.FileSystemObject")
+        Set ScriptStartRegex = new RegExp
+        Set ScriptEndRegex = new RegExp
+        ScriptStartRegex.Global = True
+        ScriptStartRegex.IgnoreCase = True
+        ScriptStartRegex.Pattern = "(<\s*script\s+(runat=(""|)server(""|)\s+language=(""|)vbscript(""|)|language=(""|)vbscript(""|) runat=(""|)server(""|))\s*>|<" & "%)"
+        ScriptEndRegex.Global = True
+        ScriptEndRegex.IgnoreCase = True
+        ScriptEndRegex.Pattern = "(%" & ">|<\s*\/script\s*>)"
     End Sub
 
 
@@ -151,46 +161,61 @@ Function ConvertCrLf(ByVal sText)
 End Function
 
 Function ProfileCode(ByVal sCode, ByVal sBaseName)
-   Dim i, j, bFirst, iLines, iFirstLine
-   Dim sOut, iPreviousLine
-   
-   'Get very base name of sBaseName
-   i = InStr(1, sBaseName, ".")
-   If i > 0 Then sBaseName = Left(sBaseName, i - 1)
+  Dim i, j, bFirst, iLines, iFirstLine
+  Dim sOut, iPreviousLine
 
-   iLines = CountLines(sCode)
-   sOut = ""
-   bFirst = True
-   iPreviousLine = -1
-   j = 1
-   i = InStr(1, sCode, "<" & "%")
+  'Get very base name of sBaseName
+  i = InStr(1, sBaseName, ".")
+  If i > 0 Then sBaseName = Left(sBaseName, i - 1)
 
-   Do While i > 0
-      sOut = sOut & Mid(sCode, j, i - j + 2)
-      j = InStr(i + 2, sCode, "%" & ">")
-      If j = 0 Then
-         Response.Write "Unclosed ASP tag!"
-         Exit Do
+  iLines = CountLines(sCode)
+  sOut = ""
+  bFirst = True
+  iPreviousLine = -1
+  j = 1
+
+  Dim startMatches, endMatches
+  Set startMatches = ScriptStartRegex.Execute(sCode)
+  Set endMatches = ScriptEndRegex.Execute(sCode)
+  dim startIndex, endOffset
+  startIndex = 0
+  endOffset = 0
+
+  'i = InStr(1, sCode, "<" & "%")
+
+  For startIndex = 0 to startMatches.Count - 1
+    i = startMatches(startIndex).FirstIndex + 1
+    sOut = sOut & Mid(sCode, j, i - j + startMatches(startIndex).length)
+    Do While startIndex + endOffset < endMatches.Count
+      j = endMatches(startIndex + endOffset).FirstIndex + 1
+      if j < i Then
+        endOffset = endOffset + 1
+      Else
+        Exit Do
       End If
-      
-      iFirstLine = CountLines(Left(sCode, i))
-      sOut = sOut & ProfileCodeBlock(Mid(sCode, i + 2, j - i - 2), iFirstLine, iPreviousLine, bFirst)
-      i = InStr(j, sCode, "<" & "%")
-   Loop
-   sOut = sOut & Mid(sCode, j)
-   
-   If bFirst Then sOut = sOut & "<" & "%" & GetProfileHeader & "%" & ">" & vbCrLf
+    Loop
 
-   AddReportingFooter sOut
+    If j < i Then
+      Err.Raise 2, "Profiler.ProfileCode", "Failed to find end of script block."
+    End If
 
-   sOut = Replace(sOut, "Response.End", "Profiler_End", 1, -1, 1)
-   sOut = Replace(sOut, "Response.Redirect", "Profiler_End '", 1, -1, 1)
-   sOut = Replace(sOut, "Server.Transfer", "Profiler_End '", 1, -1, 1)
-   sOut = Replace(sOut, "*Profiler_End*", "Response.End", 1, -1, 1)
-   sOut = Replace(sOut, sInternalCount, iLines, 1, -1, 1)
-   'sOut = Replace(sOut, sInternalFileName, sBaseName)
-   sOut = Replace(sOut, sInternalFileName, "", 1, -1, 1)
-   ProfileCode = sOut
+    iFirstLine = CountLines(Left(sCode, i))
+    sOut = sOut & ProfileCodeBlock(Mid(sCode, i + startMatches(startIndex).length, j - i - startMatches(startIndex).length), iFirstLine, iPreviousLine, bFirst)
+  Next
+  sOut = sOut & Mid(sCode, j)
+
+  If bFirst Then sOut = sOut & "<" & "%" & GetProfileHeader & "%" & ">" & vbCrLf
+
+  AddReportingFooter sOut
+
+  sOut = Replace(sOut, "Response.End", "Profiler_End", 1, -1, 1)
+  sOut = Replace(sOut, "Response.Redirect", "Profiler_End '", 1, -1, 1)
+  sOut = Replace(sOut, "Server.Transfer", "Profiler_End '", 1, -1, 1)
+  sOut = Replace(sOut, "*Profiler_End*", "Response.End", 1, -1, 1)
+  sOut = Replace(sOut, sInternalCount, iLines, 1, -1, 1)
+  'sOut = Replace(sOut, sInternalFileName, sBaseName)
+  sOut = Replace(sOut, sInternalFileName, "", 1, -1, 1)
+  ProfileCode = sOut
 End Function
 
 Function GetProfileHeader()
