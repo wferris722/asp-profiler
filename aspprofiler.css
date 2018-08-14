@@ -1,0 +1,80 @@
+* {
+  font-family: "Consolas"
+}
+
+button {
+  height: 25px;
+  border: 1px solid #ffffffcc;
+  color: #ffffffcc;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  margin-right: 15px;
+}
+
+button:hover {
+  background: white;
+  border: 1px solid black;
+  color: black;
+}
+
+#vueApp > div > button {
+  margin-left: 25px;
+  margin-right: 25px;
+  margin-top: 25px;
+  margin-bottom: 25px;
+}
+
+body {
+  overflow-y:scroll;
+  background: #1d1d1d;
+  color: #ffffffcc;
+  font-weight: normal;
+}
+
+.line_stat.line_number {
+  width: 50px;
+}
+.line_stat {
+  display: inline-block;
+  width: 75px;
+  text-align: center;
+  font-size: 12px;
+}
+.line_data {
+  display: inline;
+}
+
+.file_stat {
+  width: 75px;
+  font-weight: normal;
+  font-size: 12px;
+}
+
+input[type=text] {
+  border: 1px solid #ffffffcc;
+  color: #ffffffcc;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.5);
+  margin-left: 15px;
+}
+
+.fileView {
+  margin: 15px;  
+}
+
+.line:nth-child(odd) {
+  background: #2d2d2d;
+}
+
+.line:nth-child(even){
+  background: #3d3d3d;
+}
+
+.line_header, .fileName {
+  font-weight: bold;
+}
+
+.hidden {
+  display:none;
+}
