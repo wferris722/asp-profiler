@@ -1,5 +1,102 @@
 <%
 
+Const codeLiteral = 0
+Const codeVBScript = 1
+Const codeJScript = 2
+
+Class CodeSection
+  Public StartIndex
+  Public StartString
+  Public Content
+  Public EndIndex
+  Public EndString
+  Private inLineCount
+  Public SectionType
+
+  Private Sub Class_Initialize()
+    inLineCount = Null
+  End Sub
+
+  Public Property get LineCount()
+    If IsNull(inLineCount) Then
+      inLineCount = 0
+      Dim i: i = 1
+      Dim t
+      Do While True
+        t = InStr(i, Content, vbCrLf, vbBinaryCompare)
+        If t = 0 Then
+          Exit Do
+        End If
+        inLineCount = inLineCount + 1
+        i = t + 2
+      Loop
+    End If
+    LineCount = inLineCount
+  End Property
+
+  Public Property get StartLength()
+    StartLength = len(StartString)
+  End Property
+
+  Public Property get EndLength()
+    EndLength = len(EndString)
+  End Property
+
+  Public Sub SetLiteral(indexStart, indexEnd, sCode)
+    StartIndex = indexStart
+    EndIndex = indexEnd
+    StartString = ""
+    EndString = ""
+    SectionType = codeLiteral
+    Content = Mid(sCode, startIndex, EndIndex - startIndex)
+  End Sub
+
+  Public Sub SetCode(StartMatch, EndMatch, sCode)
+    StartIndex = StartMatch.FirstIndex + 1
+    EndIndex = EndMatch.FirstIndex + 1
+    StartString = StartMatch.Value
+    EndString = EndMatch.Value
+    Content = Mid(sCode, StartIndex + StartLength, EndIndex - (StartIndex + StartLength))
+    DetermineType
+  End Sub
+
+  Public Sub DetermineType()
+    dim isScript: isScript = true
+    If StartString = "<" & "%" Then
+      SectionType = codeVbScript
+      isScript = false
+    ElseIf Not StringContains(StartString, "runat") Then
+      SectionType = codeLiteral
+      isScript = false
+    ElseIf StringContains(StartString, "vbscript") Then
+      SectionType = codeVbScript
+    ElseIf StringContains(StartString, "jscript") Then
+      SectionType = codeJScript
+    Else
+      Err.Raise 1, "CodeSection.DetermineType", "Unable to determine the code type of the start string" & vbCrLf & DumpFields()
+    End If
+
+    If EndString = "%" & ">" And IsScript Then
+      Err.Raise 2, "CodeSection.DetermineType", "Opened with script tag, but closing tag was %" & ">" & vbCrLf & DumpFields()
+    ElseIf StringContains(EndString, "script") And Not IsScript Then
+      Err.Raise 3, "CodeSection.DetermineType", "Opened with <" & "%, but closing tag was a script tag" & vbCrLf & DumpFields()
+    End If
+  End Sub
+
+  Private Function StringContains(subject, target) 
+    StringContains = (InStr(1, subject, target, vbTextCompare) <> 0)
+  End Function
+
+  Private Function DumpFields()
+    DumpFields = "" & _
+      "StartIndex: " & StartIndex & vbCrLf & _
+      "EndIndex: " & EndIndex & vbCrLF & _
+      "StartString: '" & Server.HTMLEncode(StartString) & "'" & vbCrLf & _
+      "EndString: '" & Server.HTMLEncode(EndString) & "'" & vbCrLf
+  End Function
+
+End Class
+
 
 Const sInternalCount = "#LINECOUNT#"
 Const sInternalFileName = "#FILENAME#"
@@ -14,9 +111,12 @@ Class ProfilerBase
         Set ScriptEndRegex = new RegExp
         ScriptStartRegex.Global = True
         ScriptStartRegex.IgnoreCase = True
-        ScriptStartRegex.Pattern = "(<\s*script\s+(runat=(""|)server(""|)\s+language=(""|)vbscript(""|)|language=(""|)vbscript(""|) runat=(""|)server(""|))\s*>|<" & "%)"
+        ScriptStartRegex.MultiLine = True
+        'ScriptStartRegex.Pattern = "(^\s*<\s*script\s+(runat=(""|)server(""|)\s+language=(""|)vbscript(""|)|language=(""|)vbscript(""|)\s+runat=(""|)server(""|))\s*>|<" & "%)"
+        ScriptStartRegex.Pattern = "(<\s*script[^>]*>|<" & "%)"
         ScriptEndRegex.Global = True
         ScriptEndRegex.IgnoreCase = True
+        ScriptEndRegex.MultiLine = True
         ScriptEndRegex.Pattern = "(%" & ">|<\s*\/script\s*>)"
     End Sub
 
@@ -160,62 +260,90 @@ Function ConvertCrLf(ByVal sText)
    ConvertCrLf = sText
 End Function
 
+'Change to grab ALL <script> open and close tags, then match them up, discarding <script> tags that aren't server size, and returning just index and length of start and end tag '
 Function ProfileCode(ByVal sCode, ByVal sBaseName)
-  Dim i, j, bFirst, iLines, iFirstLine
-  Dim sOut, iPreviousLine
+  Dim i, j, bFirst
 
   'Get very base name of sBaseName
   i = InStr(1, sBaseName, ".")
   If i > 0 Then sBaseName = Left(sBaseName, i - 1)
 
-  iLines = CountLines(sCode)
-  sOut = ""
-  bFirst = True
-  iPreviousLine = -1
+  Dim codeSections: set codeSections = Server.CreateObject("System.Collections.ArrayList")
+
+  Dim startMatches: set startMatches = ScriptStartRegex.Execute(sCode)
+  Dim endMatches: set endMatches = ScriptEndRegex.Execute(sCode)
+
+  Dim startIndex: startIndex = 0
+  Dim endOffset: endOffset = 0
+  Dim jLen
   j = 1
+  jLen = 0
 
-  Dim startMatches, endMatches
-  Set startMatches = ScriptStartRegex.Execute(sCode)
-  Set endMatches = ScriptEndRegex.Execute(sCode)
-  dim startIndex, endOffset
-  startIndex = 0
-  endOffset = 0
-
-  'i = InStr(1, sCode, "<" & "%")
-
-  For startIndex = 0 to startMatches.Count - 1
+  dim section
+  For StartIndex = 0 to startMatches.Count - 1
     i = startMatches(startIndex).FirstIndex + 1
-    sOut = sOut & Mid(sCode, j, i - j + startMatches(startIndex).length)
-    Do While startIndex + endOffset < endMatches.Count
-      j = endMatches(startIndex + endOffset).FirstIndex + 1
-      if j < i Then
-        endOffset = endOffset + 1
-      Else
-        Exit Do
-      End If
+    If j+jlen <> i  Then
+      set section = new CodeSection
+      'Response.Write "index" & startIndex & ";offset" & endOffset & ";j" & j & ";jLen" & jlen & ";i" & i & "<br>"
+      section.SetLiteral j + jLen, i, sCode
+      codeSections.Add section
+    end If
+    Do While endOffset < endMatches.Count - 1 And endMatches(startIndex + endOffset).FirstIndex + 1 < i
+      endOffset = endOffset + 1
     Loop
-
-    If j < i Then
-      Err.Raise 2, "Profiler.ProfileCode", "Failed to find end of script block."
-    End If
-
-    iFirstLine = CountLines(Left(sCode, i))
-    sOut = sOut & ProfileCodeBlock(Mid(sCode, i + startMatches(startIndex).length, j - i - startMatches(startIndex).length), iFirstLine, iPreviousLine, bFirst)
+    j = endMatches(startIndex + endOffset).FirstIndex + 1
+    jLen = endMatches(startIndex + endOffset).Length
+    On Error Resume Next
+    set section = new CodeSection
+    section.SetCode startMatches(startIndex), endMatches(startIndex + endOffset), sCode
+    'If Err.Number <> 0 Then
+      Response.Write "Type: " & section.SectionType & "<br>"
+      Response.Write "Start:" & Server.HTMLEncode(section.StartString) & "<br>"
+      Response.Write "Content: <pre style=""margin-left: 15px; background: #ffffff11"">" & Server.HTMLEncode(section.Content) & "</pre>"
+      Response.WRite "End:"  & Server.HTMLEncode(section.EndString) & "<br><br>"
+    'End If
+    On Error goto 0
+    codeSections.Add section
   Next
-  sOut = sOut & Mid(sCode, j)
 
-  If bFirst Then sOut = sOut & "<" & "%" & GetProfileHeader & "%" & ">" & vbCrLf
+  Set section = new CodeSection
+  section.SetLiteral j + jLen, len(sCode) + 1, sCode
+  codeSections.Add section
+  Dim lines: lines = 1
+  Dim output: output = ""
+  bFirst = true
+  dim iPreviousLine: iPreviousLine = -1
 
-  AddReportingFooter sOut
+  For Each Section In codeSections
+    Select Case Section.Type 
+      case codeLiteral
+        lines = lines + Section.LineCount
+        output = output & Section.Content
+      case codeVBScript
+        output = output & Section.StartString
+        output = output & ProfileVBScriptCodeBlock(Section.Content, lines, iPreviousLine, bFirst)
+        output = output & Section.EndString
+        lines = lines + Section.LineCount
+      case codeJScript
+        output = output & Section.StartString
+        output = output & ProfileJScriptCodeBlock(Section.Content, liens, iPreviousLine, bFirst)
+        output = output & Section.EndString
+        lines = lines + Section.LineCount
+    End Select
+  Next
 
-  sOut = Replace(sOut, "Response.End", "Profiler_End", 1, -1, 1)
-  sOut = Replace(sOut, "Response.Redirect", "Profiler_End '", 1, -1, 1)
-  sOut = Replace(sOut, "Server.Transfer", "Profiler_End '", 1, -1, 1)
-  sOut = Replace(sOut, "*Profiler_End*", "Response.End", 1, -1, 1)
-  sOut = Replace(sOut, sInternalCount, iLines, 1, -1, 1)
+  If bFirst Then output = output & "<" & "%" & GetProfileHeader & "%" & ">" & vbCrLf
+
+  AddReportingFooter output
+
+  output = Replace(output, "Response.End", "Profiler_End", 1, -1, 1)
+  output = Replace(output, "Response.Redirect", "Profiler_End '", 1, -1, 1)
+  output = Replace(output, "Server.Transfer", "Profiler_End '", 1, -1, 1)
+  output = Replace(output, "*Profiler_End*", "Response.End", 1, -1, 1)
+  output = Replace(output, sInternalCount, lines, 1, -1, 1)
   'sOut = Replace(sOut, sInternalFileName, sBaseName)
-  sOut = Replace(sOut, sInternalFileName, "", 1, -1, 1)
-  ProfileCode = sOut
+  output = Replace(output, sInternalFileName, "", 1, -1, 1)
+  ProfileCode = output
 End Function
 
 Function GetProfileHeader()
@@ -242,7 +370,17 @@ Function GetProfileHeader()
    GetProfileHeader = sCode
 End Function
 
-Function ProfileCodeBlock(ByVal sBlock, ByVal iFirstLine, ByRef iPreviousLine, ByRef bFirst)
+Function ProfileJScriptCodeBlock(sBlock, iFirstLine, ByRef iPreviousLine, ByRef bFirst)
+  'Not yet implemented. Will require reimplementing profiling code in a
+  'JScript block, so it is in scope for both script and tag base vbscript/jscript
+  'Default order of execution is 
+  'script block for non default language (typically JScript)
+  'HTML tag blocks for default language (typically VBScript)
+  'script block for default language (typically vbscript)
+  ProfileJScriptCodeBlock = sBlock
+End Function
+
+Function ProfileVBScriptCodeBlock(ByVal sBlock, ByVal iFirstLine, ByRef iPreviousLine, ByRef bFirst)
    Dim arrLines, i, j, sLine, iLine
    Dim bSkipLine, bSkipTime, bSkipAbsolute
    Dim bUnfinishedLine, iBeginningLine 'for "_" lines
@@ -308,7 +446,7 @@ End Function
 Function GetEndProfileLine(ByVal iLine, ByVal bSkipEndTime)
    Dim sOut
    sOut = ""
-   If Not bSkipEndTime Then sOut = sOut & "Tpr_" & sInternalFileName & "_T(" & iLine & ") = Tpr_" & sInternalFileName & "_T(" & iLine & ") + 256 * (Timer - Tpr_" & sInternalFileName & "_T1)" & vbCrLf
+   If Not bSkipEndTime Then sOut = sOut & "Tpr_" & sInternalFileName & "_T(" & iLine & ") = Tpr_" & sInternalFileName & "_T(" & iLine & ") + 1000 * (Timer - Tpr_" & sInternalFileName & "_T1)" & vbCrLf
    
    GetEndProfileLine = sOut
 End Function
