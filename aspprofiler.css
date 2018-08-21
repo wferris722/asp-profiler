@@ -78,3 +78,57 @@ input[type=text] {
 .hidden {
   display:none;
 }
+
+.file_dim {
+  color: #FFFFFF26;
+
+}
+.line_dim {
+  background: transparent !important;
+  color: #FFFFFF26;
+  font-size: 8px !important;
+}
+
+.line_data {
+  font-size: 12px;
+}
+
+.line_dim .line_stat {
+  font-size: 8px !important;
+}
+
+.file_hide, .line_hide {
+  display:none;
+}
+
+.filter_controls {
+  position:fixed;
+  top: 10px;
+  right: 10px;
+  background: #00000044;
+  color: #ffffffcc;
+  padding: 15px;
+}
+
+.control_label {
+  display: inline-block;
+  width: 75px;
+  font-size: 12px;
+  text-align: right;
+}
+
+.control_span {
+  font-size: 12px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.control_span input {
+  color: #ffffffbb;
+  background: #00000044;
+  border: 1px solid #ffffffcc;
+  font-size: 12px;
+  margin-left: 2px;
+  margin-right: 2px;
+  vertical-align: middle;
+}

@@ -283,7 +283,7 @@ End Function
 Function GetEndProfileLine(ByVal iLine, ByVal bSkipEndTime)
    Dim sOut
    sOut = ""
-   If Not bSkipEndTime Then sOut = sOut & "Tpr_" & sInternalFileName & "_T(" & iLine & ") = Tpr_" & sInternalFileName & "_T(" & iLine & ") + 256 * (Timer - Tpr_" & sInternalFileName & "_T1)" & vbCrLf
+   If Not bSkipEndTime Then sOut = sOut & "Tpr_" & sInternalFileName & "_T(" & iLine & ") = Tpr_" & sInternalFileName & "_T(" & iLine & ") + 1000.0 * (Timer - Tpr_" & sInternalFileName & "_T1)" & vbCrLf
    
    GetEndProfileLine = sOut
 End Function

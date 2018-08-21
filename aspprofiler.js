@@ -1,12 +1,30 @@
 
 let app = new Vue({
     el: '#vueApp',
-    data: () => ({
+    data: {
         profileUrl: profileUrl,
         queryText: "",
         files: {},
-        hideUnusedCode: false,
-    }),
+        enableTimeMinimum: false,
+        timeMinimum: 0.0,
+        enableCountMinimum: false,
+        countMinimum: 0,
+        filterMode: "hide",
+        nextFileId: 0
+    },
+    computed: {
+      minCount() { return (this.enableCountMinimum ? this.countMinimum : -1) },
+      minTime() { return (this.enableTimeMinimum ? this.timeMinimum : -1.0) },
+      something() {
+        return JSON.stringify({
+          filter: this.filterMode || null,
+          enableTime: this.enableTimeMinimum || null,
+          time: this.timeMinimum || null,
+          enableCount: this.enableCountMinimum || null,
+          count: this.count || null
+        });
+      }
+    },
     methods: {
         generateFile(name) {
           if(name in this.files){
@@ -19,8 +37,10 @@ let app = new Vue({
             "time": 0,
             "countPercentage": 0,
             "timePercentage": 0,
-            "display": true
-          }
+            "display": true,
+            "id": "f_" + this.nextFileId.toString()
+          };
+          this.nextFileId++;
           Vue.set(this.files, name, obj);
           return obj;
         },
@@ -75,10 +95,11 @@ let app = new Vue({
               let line = lineData[d[0]-1];
               line.count = d[1];
               line.time = d[2];
+              line.id = "l_" + i.toString();
               line.countPercentage = 0;
               line.timePercentage = 0;
-              totalTime += d[1];
-              totalCount += d[2];
+              totalCount += d[1];
+              totalTime += d[2];
               file.file.lines.push(line);
               file.file.count += d[1];
               file.file.time += d[2];
@@ -96,8 +117,6 @@ let app = new Vue({
                 line.countPercentage = (line.count / totalCount) * 100.0;
               }
             }
-
-            console.log(this.files);
         }
     }
 });

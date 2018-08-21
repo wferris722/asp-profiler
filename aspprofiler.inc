@@ -35,8 +35,21 @@ End Sub
 Sub WriteProfilePrompt(profileUrl, code, limits)
 %>
     <div id="vueApp">
-        <div style="position:fixed; top: 1em; right: 1em; background: #1d1d1dcc; color: #ffffffcc;padding: 25px;">
-            <button @click="hideUnusedCode = !hideUnusedCode">toggle unused code</button>
+        <span>{{ something }}</span>
+        <div class="filter_controls">
+            <div class="control_span">
+              <span class="control_label">Display:</span>
+              <input type="radio" v-model="filterMode" value="dim">dim</input>
+              <input type="radio" v-model="filterMode" value="hide">hide</input>
+            </div>
+            <div class="control_span">
+              <span class="control_label">Min Time:</span>
+              <input type="checkbox" v-model="enableTimeMinimum"><input type="number" :disabled="!enableTimeMinimum" v-model.number="timeMinimum"/>ms
+            </div>
+            <div class="control_span">
+              <span class="control_label">Min Count:</span>
+              <input type="checkbox" v-model="enableCountMinimum"><input type="number" :disabled="!enableCountMinimum" v-model.number="countMinimum"/>ms
+            </div>
         </div>
         <div>
           <span><b>{{profileUrl}}</b>?<input type="text" :value="queryText"/><br>
@@ -46,7 +59,7 @@ Sub WriteProfilePrompt(profileUrl, code, limits)
           <button @click="collapseAll()">Collapse All</button>
           <button @click="expandAll()">Expand All</button>
         </div>
-        <div class="fileView" v-for="file in files">
+        <div class="fileView" v-for="file in files" :key="file.id" :class="{ 'file_dim': filterMode == 'dim' && (file.count < minCount || file.time < minTime), 'file_hide': filterMode == 'hide' && (file.count < minCount || file.time < minTime) }">
           <div class="fileName">
             <button class="button" @click="file.display = !file.display">{{ file.display ? "-" : "+" }}</button>
             <span class="file_stat file_count">{{ file.count }} ({{ file.countPercentage.toFixed(2) }}%)</span>
@@ -59,7 +72,9 @@ Sub WriteProfilePrompt(profileUrl, code, limits)
               <span class="line_stat line_count">Count</span>
               <span class="line_stat line_time">Time</span>
             </div>
-            <div class="line" :class="{'hidden' : hideUnusedCode && line.count == 0}" v-for="(line, index) in file.lines">
+            <div class="line"
+              :class="{ 'line_dim' : filterMode == 'dim' && (line.count < minCount || line.time < minTime), 'line_hide': filterMode == 'hide' && (line.count < minCount || line.time < minTime) }" 
+              v-for="(line, index) in file.lines" :key="line.id">
               <span class="line_stat line_number">{{ index + 1 }}</span>
               <span class="line_stat line_count">{{ line.count }} ({{ line.countPercentage.toFixed(2) }}%)</span>
               <span class="line_stat line_time">{{ line.time }} ({{ line.timePercentage.toFixed(2) }}%)</span>
