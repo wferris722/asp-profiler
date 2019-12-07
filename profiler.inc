@@ -319,11 +319,15 @@ Sub AddReportingFooter(ByRef sCode)
    sCode = sCode & "<" & "%Profiler_End%" & ">"
 End Sub
 
+Function IsLineUnfinished(line)
+   IsLineUnfinished = (Right(RTrim(line),1) = "_")
+End Function
+
 Sub CheckLine(ByVal sLine, ByRef bSkipLine, ByRef bSkipTime, ByRef bSkipAbsolute, ByRef bUnfinishedLine)
    Dim i, sFirst
    
    bSkipAbsolute = False 'to skip Option Explicit etc before writing Dim.
-   bUnfinishedLine = (Right(RTrim(sLine),1) = "_")
+   bUnfinishedLine = IsLineUnfinished(sLine)
    
    '@ directives
    If Left(sLine, 1) = "@" Then '@language = vbscript etc.
@@ -348,7 +352,7 @@ Sub CheckLine(ByVal sLine, ByRef bSkipLine, ByRef bSkipTime, ByRef bSkipAbsolute
          bSkipLine = True
          Exit Sub
       Case "case", "dim", "public", "private", "const", "class", "sub", "function", "property", "static", "end"
-         bSkipLine = (Not bUnfinishedLine)
+         bSkipLine = True
          Exit Sub
       Case "select", "class"
          bSkipLine = False
