@@ -225,7 +225,7 @@ Function ProfileCodeBlock(ByVal sBlock, ByVal iFirstLine, ByRef iPreviousLine, B
    sBlock = ""
    iBeginningLine = -1
    For i = 0 To UBound(arrLines)
-      sLine = Trim(Replace(arrLines(i), vbTab, ""))
+      sLine = Trim(Replace(arrLines(i), vbTab, " "))
       If Len(sLine) > 0 Then
          CheckLine sLine, bSkipLine, bSkipTime, bSkipAbsolute, bUnfinishedLine
          If Not bSkipAbsolute And bFirst Then
