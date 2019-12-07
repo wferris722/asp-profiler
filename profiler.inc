@@ -250,8 +250,21 @@ Function ProfileCodeBlock(ByVal sBlock, ByVal iFirstLine, ByRef iPreviousLine, B
                End If
             End If
          Else
-            'ignore
-            sBlock = sBlock & arrLines(i)
+            If bUnfinishedLine Then
+               Dim t, tx: t = TRIM(REPLACE(arrLines(i), vbTab, " "))
+               tx = Mid(t, 1, len(t)-1)
+               i = i + 1
+               Do While IsLineUnfinished(arrLines(i))
+                  t = TRIM(REPLACE(arrLines(i), vbTab, " "))
+                  tx = tx & " " & mid(t, 1, len(t)-1)
+                  i = i + 1
+               Loop
+               tx = tx & " " &trim(REPLACE(arrlines(i), vbTab, " "))
+               sBlock = sBlock & tx
+            Else
+               'ignore
+               sBlock = sBlock & arrLines(i)
+            End If
          End If
       Else
          'ignore
